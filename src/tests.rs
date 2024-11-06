@@ -2,7 +2,7 @@
 mod tests {
     use std::path::PathBuf;
 
-    use chrono::{TimeZone, Utc};
+    use time::{Date, Month, OffsetDateTime, Time};
 
     use crate::validate_args;
 
@@ -58,8 +58,14 @@ mod tests {
         let start_date = String::from("11-04-2024");
         let end_date = String::from("11-24-2024");
         let expected = (
-            Utc.with_ymd_and_hms(2024, 11, 4, 0, 0, 0).unwrap(),
-            Utc.with_ymd_and_hms(2024, 11, 24, 0, 0, 0).unwrap(),
+            OffsetDateTime::new_utc(
+                Date::from_calendar_date(2024, Month::November, 4).unwrap(),
+                Time::from_hms_nano(0, 0, 0, 0).unwrap(),
+            ),
+            OffsetDateTime::new_utc(
+                Date::from_calendar_date(2024, Month::November, 24).unwrap(),
+                Time::from_hms_nano(0, 0, 0, 0).unwrap(),
+            ),
         );
 
         // act
@@ -76,8 +82,14 @@ mod tests {
         let start_date = String::from("11/04/2024");
         let end_date = String::from("11/24/2024");
         let expected = (
-            Utc.with_ymd_and_hms(2024, 11, 4, 0, 0, 0).unwrap(),
-            Utc.with_ymd_and_hms(2024, 11, 24, 0, 0, 0).unwrap(),
+            OffsetDateTime::new_utc(
+                Date::from_calendar_date(2024, Month::November, 4).unwrap(),
+                Time::from_hms_nano(0, 0, 0, 0).unwrap(),
+            ),
+            OffsetDateTime::new_utc(
+                Date::from_calendar_date(2024, Month::November, 24).unwrap(),
+                Time::from_hms_nano(0, 0, 0, 0).unwrap(),
+            ),
         );
 
         // act
