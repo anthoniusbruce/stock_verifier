@@ -55,7 +55,6 @@ fn modify_html(path: PathBuf, start_date: OffsetDateTime, end_date: OffsetDateTi
                 for node in symbol.children.clone() {
                     if let Node::Text(sym) = node {
                         let percent_change = get_percent_change(&sym, start_date, end_date);
-                        println!("{sym} - actual change {percent_change}");
                         let css_query = &format!("div#{sym}")[..];
                         let percent = Node::new_element(
                             "span",
@@ -72,8 +71,6 @@ fn modify_html(path: PathBuf, start_date: OffsetDateTime, end_date: OffsetDateTi
                             }
                         }
 
-                        //                        dom.insert_to(&Selector::from(css_query), percent);
-                        //println!("{sym} dom: {:?}", dom);
                         break;
                     }
                 }
