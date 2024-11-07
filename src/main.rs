@@ -1,11 +1,17 @@
 use std::{
-    fs,
+    fs::{self, File},
+    io::Write,
     path::{Path, PathBuf},
 };
 
-use html_editor::parse;
+use html_editor::{
+    operation::{Editable, Htmlifiable, Queryable, Selector},
+    parse, Node,
+};
 use structopt::StructOpt;
 use time::{Date, Month, OffsetDateTime, Time};
+use tokio::runtime::Builder;
+use yahoo_finance_api::Quote;
 
 mod tests;
 
@@ -38,14 +44,102 @@ fn main() {
 fn modify_html(path: PathBuf, start_date: OffsetDateTime, end_date: OffsetDateTime) {
     let result: Result<String, std::io::Error>;
     {
-        result = fs::read_to_string(path);
+        result = fs::read_to_string(path.to_owned());
     }
     match result {
         Ok(s) => {
             let mut dom = parse(&s).expect("html could not be parsed");
+            let immutable_dom = dom.to_owned();
+            let symbols = immutable_dom.query_all(&Selector::from(".item-header"));
+            for symbol in symbols {
+                for node in symbol.children.clone() {
+                    if let Node::Text(sym) = node {
+                        let percent_change = get_percent_change(&sym, start_date, end_date);
+                        println!("{sym} - actual change {percent_change}");
+                        let css_query = &format!("div#{sym}")[..];
+                        let percent = Node::new_element(
+                            "span",
+                            vec![("class", "primary blue")],
+                            vec![Node::Text(format!("{percent_change}"))],
+                        );
+
+                        let node_option = dom.query_mut(&Selector::from(css_query));
+                        match node_option {
+                            None => println!("{sym} node not found"),
+                            Some(node) => {
+                                node.children.push(Node::Text(String::from(": ")));
+                                node.children.push(percent);
+                            }
+                        }
+
+                        //                        dom.insert_to(&Selector::from(css_query), percent);
+                        //println!("{sym} dom: {:?}", dom);
+                        break;
+                    }
+                }
+            }
+            let html = dom.trim().html();
+            let mut new_file = path.to_owned();
+            new_file.set_extension("updated.html");
+
+            let file_result = File::create(new_file);
+            match file_result {
+                Err(e) => println!("{e}"),
+                Ok(mut file) => match file.write_all(html.as_bytes()) {
+                    Err(e) => println!("{e}"),
+                    Ok(_) => (),
+                },
+            }
         }
         Err(e) => panic!("{e}"),
     }
+}
+
+fn get_percent_change(symbol: &str, start_date: OffsetDateTime, end_date: OffsetDateTime) -> i32 {
+    let mut quotes = get_quotes(&symbol, start_date, end_date);
+
+    if quotes.len() < 1 {
+        return 0;
+    }
+
+    let start_quote = quotes[0].clone();
+    let end_quote = quotes.pop().unwrap();
+
+    if start_quote.open == 0.0 {
+        return 0;
+    }
+
+    let gain = (end_quote.close - start_quote.open) / start_quote.open;
+    (gain * 100.0).round() as i32
+}
+
+fn get_quotes(symbol: &str, start_date: OffsetDateTime, end_date: OffsetDateTime) -> Vec<Quote> {
+    let quotes = Vec::new();
+    let provider_result = yahoo_finance_api::YahooConnector::new();
+    match provider_result {
+        Err(e) => println!("{e}"),
+        Ok(provider) => {
+            let builder_result = Builder::new_current_thread().enable_all().build();
+            match builder_result {
+                Err(e) => println!("{e}"),
+                Ok(builder) => {
+                    let resp_result =
+                        builder.block_on(provider.get_quote_history(symbol, start_date, end_date));
+                    match resp_result {
+                        Err(e) => println!("{e}"),
+                        Ok(resp) => match resp.quotes() {
+                            Err(e) => println!("{e}"),
+                            Ok(quotes) => {
+                                return quotes;
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    quotes
 }
 
 fn validate_args(
